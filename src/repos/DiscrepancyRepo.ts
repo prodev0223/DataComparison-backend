@@ -21,7 +21,7 @@ const parseHomeAwayFromSource = (data: any)=> {
   }
 }
 
-const checkPlayerExist = (players: Player[] , _player: Player)=> {
+const checkPlayerExist = (players: any[], _player: Player)=> {
   players.forEach((player, index)=>{
     if(player.id === _player.id)return index;
   })
@@ -30,21 +30,33 @@ const checkPlayerExist = (players: Player[] , _player: Player)=> {
 }
 
 const parsePlayerFromSource = (data: any)=> {
-  let players: Player[] = [];
+  let players = [];
   let rushingPlayers = data.rushing.players;
   let receivingPlayers = data.receiving.players;
 
   for(let player of rushingPlayers){
-      players.push(player)
+	players.push({
+		id: player.id,
+		rushAttempts: player.attempts,
+		rushTds: player.touchdowns,
+		rushYdsGained: player.yards,
+	})
   }
 
   for(let player of receivingPlayers){
       let checkExist = checkPlayerExist(players, player);
       
       if(checkExist>=0){
-          players[checkExist] = {...players[checkExist], ...player}
+		players[checkExist] = {...players[checkExist], ...{
+			rec: player.receptions,
+			receivingYards: player.yards
+		}}
       }else{
-          players.push(player);
+		players.push({
+			id: player.id,
+			rec: player.receptions,
+			receivingYards: player.yards,
+		});
       }
   }
 
@@ -129,7 +141,8 @@ const parseExternalInputToCompareFormat = async(inputData: any, mode=0)=> {
 
 const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
     let discrepancies: any = {};
-
+	discrepancies.id = source.game.id;
+	
     // compare game and compare home/away statistic
     let arrToCompare = ['home','away', 'game'];
     for(let key in source){
@@ -151,8 +164,8 @@ const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
 	// compare players
     arrToCompare = ['homePlayers','awayPlayers'];
     for(let key in source){
-        discrepancies[key] = [];
         if(arrToCompare.indexOf(key)>=0){
+			discrepancies[key] = [];
             let sourceArr = source[key];
             let externalArr = external[key];
 
