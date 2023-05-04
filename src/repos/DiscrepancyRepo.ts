@@ -145,19 +145,33 @@ const parseSourceInputToCompareFormat = async(inputData: any , mode = 0)=> {
  */
 const parseExternalInputToCompareFormat = async(inputData: any, mode=0)=> {
 	const { game } = inputData;
-	let newStatistic = {
-		home: parseHomeAwayFromExternal(game.home),
-		away: parseHomeAwayFromExternal(game.away),
-		homePlayers: parsePlayerFromExternal(game.home),
-		awayPlayers: parsePlayerFromExternal(game.away),
-		game: parseGameFromExternal(game)
-	};
+	let newStatistic: ParsedType = {
+        home: undefined,
+        away: undefined,
+        homePlayers: undefined,
+        awayPlayers: undefined,
+        game: undefined
+    };
+
+	if(mode == FilterType.All || mode == FilterType.Team){
+        newStatistic.home = parseHomeAwayFromExternal(game.home);
+        newStatistic.away = parseHomeAwayFromExternal(game.away);
+    }
+
+    if(mode == FilterType.All || mode == FilterType.Player){
+        newStatistic.homePlayers = parsePlayerFromExternal(game.home);
+        newStatistic.awayPlayers = parsePlayerFromExternal(game.away);
+    }
+
+    if(mode == FilterType.All || mode == FilterType.Game){
+        newStatistic.game = parseGameFromExternal(game)
+    }
+
 	return newStatistic;
 }
 
 const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
     let discrepancies: any = {};
-	discrepancies.id = source.game.id;
 	
     // compare game and compare home/away statistic
     let arrToCompare = ['home','away', 'game'];
@@ -178,7 +192,7 @@ const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
     }
 
 	// compare players
-    arrToCompare = ['homePlayers','awayPlayers'];
+    arrToCompare = (mode == FilterType.All || mode == FilterType.Player) ? ['homePlayers', 'awayPlayers'] : [];
     for(let key in source){
         if(arrToCompare.indexOf(key)>=0){
 			discrepancies[key] = [];
