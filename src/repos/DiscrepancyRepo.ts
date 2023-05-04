@@ -73,21 +73,11 @@ const parseHomeAwayFromExternal = (data: any)=> {
 
 const parsePlayerFromExternal = (data: any)=> {
     let players: Player[] = [];
-    let rushingPlayers = data.rushing.players;
-    let receivingPlayers = data.receiving.players;
 
-    for(let player of rushingPlayers){
+    for(let player of data.players){
         players.push(player)
     }
 
-    for(let player of receivingPlayers){
-        let checkExist = checkPlayerExist(players, player);
-        if(checkExist>=0){
-            players[checkExist] = {...players[checkExist] , ...player}
-        }else{
-            players.push(player);
-        }
-    }
     return players;
 }
 
@@ -107,7 +97,7 @@ const parseGameFromExternal = (data: any)=> {
 const parseSourceInputToCompareFormat = async(inputData: any , mode = 0)=> {
     const { statistics, game } = inputData;
 
-    var newStatistic = {
+    let newStatistic = {
         home: parseHomeAwayFromSource(statistics.home),
         away: parseHomeAwayFromSource(statistics.away),
         homePlayers: parsePlayerFromSource(statistics.home),
@@ -137,16 +127,75 @@ const parseExternalInputToCompareFormat = async(inputData: any, mode=0)=> {
 	return newStatistic;
 }
 
+const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
+    let discrepancies: any = {};
+
+    // compare game and compare home/away statistic
+    let arrToCompare = ['home','away', 'game'];
+    for(let key in source){
+        discrepancies[key] = {};
+        if(arrToCompare.indexOf(key)>=0){
+            for(let _subKey in source[key]){
+                if(source[key][_subKey] != external[key][_subKey]){
+                    discrepancies[key][_subKey] = source[key][_subKey] + '-' + external[key][_subKey]
+                }
+            }
+            for(let _subKey in external[key]){
+                if(source[key][_subKey] != external[key][_subKey] && discrepancies[key][_subKey] == undefined ){
+                    discrepancies[key][_subKey] = source[key][_subKey] + '-' + external[key][_subKey]
+                }
+            }
+        }
+    }
+
+	// compare players
+    arrToCompare = ['homePlayers','awayPlayers'];
+    for(let key in source){
+        discrepancies[key] = [];
+        if(arrToCompare.indexOf(key)>=0){
+            let sourceArr = source[key];
+            let externalArr = external[key];
+
+            // find player to compare
+            for(let i = 0; i<sourceArr.length; i++){
+                discrepancies[key].push({id:sourceArr[i].id})
+                let length = discrepancies[key].length;
+                for(let j = 0; j<externalArr.length; j++){
+                    if(sourceArr[i].id === externalArr[j].id){
+                        for(let _subKey in sourceArr[i]){
+                            if(sourceArr[i][_subKey] != externalArr[j][_subKey]){
+                                discrepancies[key][length-1][_subKey] = sourceArr[i][_subKey] + '-' + externalArr[j][_subKey]
+                            }
+                        }
+
+                        for(let _subKey in externalArr[j]){
+                            if(sourceArr[i][_subKey] != externalArr[j][_subKey]&& discrepancies[key][length-1][_subKey]!=undefined ){
+                                discrepancies[key][length-1][_subKey] = sourceArr[i][_subKey] + '-' + externalArr[j][_subKey]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return discrepancies
+}
+
 /**
  * Get by mode0
  */
 const getDataByField = async(mode = 0)=> {
     const externalData = readJSONSync(__dirname + '/' + 'external.json');
     const sourceData = readJSONSync(__dirname + '/' + 'source.json');
-	const newExternalData = parseExternalInputToCompareFormat (externalData , mode);
-    const newSourceData = parseSourceInputToCompareFormat(sourceData , mode);
-
-    return newExternalData;
+	const newExternalData = await parseExternalInputToCompareFormat(externalData, mode);
+    const newSourceData = await parseSourceInputToCompareFormat(sourceData, mode);
+    const comparedDiscrepancies = await compareDiscrepancy(newSourceData,newExternalData, mode);
+    
+    return {
+        external:newExternalData,
+        source: newSourceData,
+        comparedDiscrepancies: comparedDiscrepancies
+    };
 }
 
 /**
