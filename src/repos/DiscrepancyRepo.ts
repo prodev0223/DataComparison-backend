@@ -1,6 +1,7 @@
 // **** Functions **** //
 import { readJSONSync } from "fs-extra";
 import { Player } from "@src/models/player";
+import { FilterType } from "@src/models/FilterType";
 
 /* #region Parse data for source.json */
 /**
@@ -218,12 +219,23 @@ const getAll = async()=> {
     return getDataByField();
 }
 
-async function filterByGame() {
-    return getDataByField(1);
+const filterByGame = ()=> {
+    return getDataByField(FilterType.Game);
+}
+
+const filterByPlayer = ()=> {
+    return getDataByField(FilterType.Player);
+}
+
+const filterByTeam = ()=> {
+    return getDataByField(FilterType.Team);
 }
 
 // **** Export default **** //
 
 export default {
     getAll,
+	filterByGame,
+    filterByPlayer,
+    filterByTeam
 } as const;
