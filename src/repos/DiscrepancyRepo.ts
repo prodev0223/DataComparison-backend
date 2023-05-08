@@ -2,7 +2,6 @@
 import { readJSONSync } from "fs-extra";
 import { Player } from "@src/models/player";
 import { FilterType } from "@src/models/FilterType";
-import { ParsedType } from "@src/models/ParsedType";
 
 /* #region Parse data for source.json */
 /**
@@ -24,53 +23,58 @@ const parseHomeAwayFromSource = (data: any)=> {
 }
 
 const checkPlayerExist = (players: any[], _player: Player)=> {
-  players.forEach((player, index)=>{
-    if(player.id === _player.id)return index;
-  })
-
-  return -1;
+    const index = players.findIndex((player)=>player.id === _player.id)
+    return index
 }
 
 const parsePlayerFromSource = (data: any)=> {
-  let players = [];
-  let rushingPlayers = data.rushing.players;
-  let receivingPlayers = data.receiving.players;
+    let players = [];
+    let rushingPlayers = data.rushing.players;
+    let receivingPlayers = data.receiving.players;
 
-  for(let player of rushingPlayers){
-	players.push({
-		id: player.id,
-		rushAttempts: player.attempts,
-		rushTds: player.touchdowns,
-		rushYdsGained: player.yards,
-	})
-  }
+    players = rushingPlayers.map((player: any)=>{
+        return {
+            id: player.id,
+            rushAttempts: player.attempts,
+            rushTds: player.touchdowns,
+            rushYdsGained: player.yards,
+        }
+    })
+  
+    for(let player of receivingPlayers){
+        let checkExist = checkPlayerExist(players, player);
+        
+        if(checkExist>=0){
+            players[checkExist] = {...players[checkExist], ...{
+                rec: player.receptions,
+                receivingYards: player.yards
+            }}
+        }else{
+            players.push({
+                id: player.id,
+                rec: player.receptions,
+                receivingYards: player.yards,
+            });
+        }
+    }
 
-  for(let player of receivingPlayers){
-      let checkExist = checkPlayerExist(players, player);
-      
-      if(checkExist>=0){
-		players[checkExist] = {...players[checkExist], ...{
-			rec: player.receptions,
-			receivingYards: player.yards
-		}}
-      }else{
-		players.push({
-			id: player.id,
-			rec: player.receptions,
-			receivingYards: player.yards,
-		});
-      }
-  }
-
-  return players;
+    return players;
 }
 
 const parseGameFromSource = (data: any)=> {
     return {
-        gameId: data.id,
+        id: data.id,
         attendance: data.attendance,
     }
 }
+
+const parseGameFromExternal = (data: any)=> {
+    return {
+        id: data.id,
+        attendance: data.attendance,
+    }
+}
+
 /* #endregion */
 
 /* #region Parse data for external.json */
@@ -95,12 +99,6 @@ const parsePlayerFromExternal = (data: any)=> {
     return players;
 }
 
-const parseGameFromExternal = (data: any)=> {
-    return {
-        gameId: data.id,
-        attendance: data.attendance,
-    }
-}
 /* #endregion */
 
 /**
@@ -111,32 +109,37 @@ const parseGameFromExternal = (data: any)=> {
 const parseSourceInputToCompareFormat = async(inputData: any , mode = 0)=> {
     const { statistics, game } = inputData;
 
-    let newStatistic: ParsedType = {
-        home: undefined,
-        away: undefined,
-        homePlayers: undefined,
-        awayPlayers: undefined,
-        game: undefined
-    };
+    switch(mode){
+    case FilterType.All:
+        return {
+            home: parseHomeAwayFromSource(statistics.home),
+            away: parseHomeAwayFromSource(statistics.away),
+            homePlayers: parsePlayerFromSource(statistics.home),
+            awayPlayers: parsePlayerFromSource(statistics.away),
+            game: parseGameFromSource(game)
+        };
+    case FilterType.Team:
+        return {
+            home: parseHomeAwayFromSource(statistics.home),
+            away: parseHomeAwayFromSource(statistics.away),
+        };
+    case FilterType.Player:
+        return {
+            homePlayers: parsePlayerFromSource(statistics.home),
+            awayPlayers: parsePlayerFromSource(statistics.away),
+            home: {id:statistics.home.id},
+            away: {id:statistics.away.id}
+        };
+    case FilterType.Game:
+        return {
+            game: parseGameFromSource(game)
+        };
+    default:
+        return {
 
-	if(mode == FilterType.All || mode == FilterType.Team){
-        newStatistic.home = parseHomeAwayFromSource(statistics.home);
-        newStatistic.away = parseHomeAwayFromSource(statistics.away);
+        }
     }
-
-    if(mode == FilterType.All || mode == FilterType.Player){
-        newStatistic.homePlayers = parsePlayerFromSource(statistics.home);
-        newStatistic.awayPlayers = parsePlayerFromSource(statistics.away);
-    }
-
-    if(mode == FilterType.All || mode == FilterType.Game){
-        newStatistic.game = parseGameFromSource(game)
-    }
-
-    return newStatistic;
 }
-
-
 
 /**
  * 
@@ -145,29 +148,37 @@ const parseSourceInputToCompareFormat = async(inputData: any , mode = 0)=> {
  */
 const parseExternalInputToCompareFormat = async(inputData: any, mode=0)=> {
 	const { game } = inputData;
-	let newStatistic: ParsedType = {
-        home: undefined,
-        away: undefined,
-        homePlayers: undefined,
-        awayPlayers: undefined,
-        game: undefined
-    };
+	
+    switch(mode){
+    case FilterType.All:
+        return {
+            home: parseHomeAwayFromExternal(game.home),
+            away: parseHomeAwayFromExternal(game.away),
+            homePlayers: parsePlayerFromExternal(game.home),
+            awayPlayers: parsePlayerFromExternal(game.away),
+            game: parseGameFromExternal(game)
+        }
+    case FilterType.Team:
+        return {
+            home: parseHomeAwayFromExternal(game.home),
+            away: parseHomeAwayFromExternal(game.away),
+        }
+    case FilterType.Player:
+        return {
+            homePlayers: parsePlayerFromExternal(game.home),
+            awayPlayers: parsePlayerFromExternal(game.away),
+            home: {id: game.home.id},
+            away: {id: game.away.id}
+        }
+    case FilterType.Game:
+        return {
+            game: parseGameFromExternal(game)
+        }
+    default:
+        return {
 
-	if(mode == FilterType.All || mode == FilterType.Team){
-        newStatistic.home = parseHomeAwayFromExternal(game.home);
-        newStatistic.away = parseHomeAwayFromExternal(game.away);
+        }
     }
-
-    if(mode == FilterType.All || mode == FilterType.Player){
-        newStatistic.homePlayers = parsePlayerFromExternal(game.home);
-        newStatistic.awayPlayers = parsePlayerFromExternal(game.away);
-    }
-
-    if(mode == FilterType.All || mode == FilterType.Game){
-        newStatistic.game = parseGameFromExternal(game)
-    }
-
-	return newStatistic;
 }
 
 const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
@@ -175,25 +186,19 @@ const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
 	
     // compare game and compare home/away statistic
     let arrToCompare = ['home','away', 'game'];
-    for(let key in source){
-        if(key == 'game'){
-            discrepancies[key] = {
-                id: source[key]?.gameId??'',
-            };
-        }else{
-            discrepancies[key] = {
-                id: source[key]?.id??'',
-            };
-        }
+    for(const key in source){
+        discrepancies[key] = {
+            id: source[key]?.id??'',
+        };
 		
         if(arrToCompare.indexOf(key)>=0){
-            for(let _subKey in source[key]){
-                if(source[key][_subKey] != external[key][_subKey]){
+            for(const _subKey in source[key]){
+                if(_subKey !== 'id'){
                     discrepancies[key][_subKey] = parseInt(source[key][_subKey]) - parseInt(external[key][_subKey])
                 }
             }
-            for(let _subKey in external[key]){
-                if(source[key][_subKey] != external[key][_subKey] && discrepancies[key][_subKey] == undefined ){
+            for(const _subKey in external[key]){
+                if(_subKey !== 'id' && discrepancies[key][_subKey] === undefined){
                     discrepancies[key][_subKey] = parseInt(source[key][_subKey]) - parseInt(external[key][_subKey])
                 }
             }
@@ -201,8 +206,8 @@ const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
     }
 
 	// compare players
-    arrToCompare = (mode == FilterType.All || mode == FilterType.Player) ? ['homePlayers', 'awayPlayers'] : [];
-    for(let key in source){
+    arrToCompare = (mode === FilterType.All || mode === FilterType.Player) ? ['homePlayers', 'awayPlayers'] : [];
+    for(const key in source){
         if(arrToCompare.indexOf(key)>=0){
 			discrepancies[key] = [];
             let sourceArr = source[key];
@@ -214,15 +219,17 @@ const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
                 let length = discrepancies[key].length;
                 for(let j = 0; j<externalArr.length; j++){
                     if(sourceArr[i].id === externalArr[j].id){
-                        for(let _subKey in sourceArr[i]){
-                            if(sourceArr[i][_subKey] != externalArr[j][_subKey]){
-								discrepancies[key][length-1][_subKey] = parseInt(sourceArr[i][_subKey]) - parseInt(externalArr[j][_subKey])
+                        for(const _subKey in sourceArr[i]){
+                            if(_subKey !== 'id'){
+                                discrepancies[key][length-1][_subKey] = parseInt(sourceArr[i][_subKey]) - parseInt(externalArr[j][_subKey])
+                            }else{
+                                discrepancies[key][length-1][_subKey] = sourceArr[i][_subKey];
                             }
                         }
 
-                        for(let _subKey in externalArr[j]){
-                            if(sourceArr[i][_subKey] != externalArr[j][_subKey]&& discrepancies[key][length-1][_subKey]!=undefined ){
-								discrepancies[key][length-1][_subKey] = parseInt(sourceArr[i][_subKey]) - parseInt(externalArr[j][_subKey])
+                        for(const _subKey in externalArr[j]){
+                            if(_subKey !== 'id'&&discrepancies[key][length-1][_subKey] !== undefined){
+                                discrepancies[key][length-1][_subKey] = parseInt( sourceArr[i][_subKey]) - parseInt(externalArr[j][_subKey])
                             }
                         }
                     }
@@ -243,11 +250,7 @@ const getDataByField = async(mode = 0)=> {
     const newSourceData = await parseSourceInputToCompareFormat(sourceData, mode);
     const comparedDiscrepancies = await compareDiscrepancy(newSourceData,newExternalData, mode);
     
-    return {
-        external:newExternalData,
-        source: newSourceData,
-        comparedDiscrepancies: comparedDiscrepancies
-    };
+    return comparedDiscrepancies;
 }
 
 /**

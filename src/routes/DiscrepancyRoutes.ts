@@ -3,8 +3,8 @@ import DiscrepancyService from '@src/services/DiscrepancyService';
 import { IReq, IRes } from './types/express/misc';
 
 const getAll = async(_: IReq, res: IRes)=> {
-    const data = {}
-    return res.status(HttpStatusCodes.OK).json(data);
+  const data = await DiscrepancyService.getAll();
+  return res.status(HttpStatusCodes.OK).json(data);
 }
 
 const getByGame = async(_: IReq, res: IRes)=> {
