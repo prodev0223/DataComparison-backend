@@ -176,7 +176,16 @@ const compareDiscrepancy = (source: any, external: any , mode = 0)=> {
     // compare game and compare home/away statistic
     let arrToCompare = ['home','away', 'game'];
     for(let key in source){
-        discrepancies[key] = {};
+        if(key == 'game'){
+            discrepancies[key] = {
+                id: source[key]?.gameId??'',
+            };
+        }else{
+            discrepancies[key] = {
+                id: source[key]?.id??'',
+            };
+        }
+		
         if(arrToCompare.indexOf(key)>=0){
             for(let _subKey in source[key]){
                 if(source[key][_subKey] != external[key][_subKey]){
